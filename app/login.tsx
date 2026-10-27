@@ -1,0 +1,203 @@
+import { useState } from 'react';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
+import { Link } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import AppButton from '@/components/AppButton';
+import Header from '@/components/Header';
+import { COLORS } from '@/constants/colors';
+import { signIn } from '@/lib/auth';
+import { validateEmail } from '@/lib/validation';
+
+export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // EVENT: "Sign In" pressed -> validate input -> Supabase signs the user in.
+  // On success an auth event updates the session and the route guard in
+  // app/_layout.tsx moves the user into the app automatically.
+  const handleLogin = async () => {
+    setError(null);
+
+    const emailProblem = validateEmail(email);
+    if (emailProblem) {
+      setError(emailProblem);
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: authError } = await signIn(email.trim(), password);
+      if (authError) {
+        // Do not reveal whether the email exists.
+        setError(
+          authError.message.toLowerCase().includes('email not confirmed')
+            ? 'Please confirm your email first, then sign in.'
+            : 'Incorrect email or password.'
+        );
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Unexpected error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.headerContainer}>
+              <Header title="QR Attendance" />
+            </View>
+
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>
+              Sign in to record your attendance
+            </Text>
+
+            <View style={styles.form}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="your.email@school.edu"
+                placeholderTextColor={COLORS.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                editable={!loading}
+              />
+
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={COLORS.muted}
+                secureTextEntry
+                editable={!loading}
+              />
+
+              {error && <Text style={styles.error}>{error}</Text>}
+
+              {loading ? (
+                <ActivityIndicator
+                  size="large"
+                  color={COLORS.primary}
+                  style={styles.loader}
+                />
+              ) : (
+                <AppButton
+                  theme="primary"
+                  title="Sign In"
+                  icon="log-in-outline"
+                  onPress={handleLogin}
+                />
+              )}
+            </View>
+
+            <Link href="/register" style={styles.link}>
+              Don&apos;t have an account? Sign Up
+            </Link>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  headerContainer: {
+    alignItems: 'flex-start',
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 21,
+    color: COLORS.textSecondary,
+    marginBottom: 32,
+  },
+  form: {
+    marginBottom: 24,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  input: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  error: {
+    fontSize: 14,
+    color: COLORS.danger,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  loader: {
+    marginVertical: 16,
+  },
+  link: {
+    fontSize: 14,
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+});
